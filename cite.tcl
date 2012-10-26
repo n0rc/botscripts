@@ -47,25 +47,25 @@ proc pub:cdbhelp {n u h c a} {
 }
 
 proc pub:cdblist {n u h c a} {
-	global cites
+    global cites
    	set citequery [lsort -integer [array names cites]]
-	if {[llength $citequery] == 0} {
-		putquick "PRIVMSG $c :currently no facts exist"
-	} else {
-		foreach i $citequery {
-			puthelp "PRIVMSG $n :\[$i\] $cites($i)"
-		}
-	}
+    if {[llength $citequery] == 0} {
+        putquick "PRIVMSG $c :currently no facts exist"
+    } else {
+        foreach i $citequery {
+            puthelp "PRIVMSG $n :\[$i\] $cites($i)"
+        }
+    }
 }
 
 proc pub:cdbfact {n u h c a} {
-	global cites
-	set id [lindex $a 0]
-	if {[info exists cites($id)]} {
-		putquick "PRIVMSG $c :\[$id\] $cites($id)"
-	} else {
-		putquick "PRIVMSG $c :fact $id does not exist"
-	}
+    global cites
+    set id [lindex $a 0]
+    if {[info exists cites($id)]} {
+        putquick "PRIVMSG $c :\[$id\] $cites($id)"
+    } else {
+        putquick "PRIVMSG $c :fact $id does not exist"
+    }
 }
 
 proc pub:cdbsearch {n u h c a} {
@@ -98,22 +98,22 @@ proc pub:cdbsearch {n u h c a} {
 }
 
 proc pub:cdbdel {n u h c a} {
-	global cites
-	set what [string trim $a]
-	set j 0
-	foreach i $what {
-		if {[info exists cites($i)]} {
-			unset cites($i)
-			incr j
-		}
-	}
-	putquick "PRIVMSG $c :$j facts removed"
+    global cites
+    set what [string trim $a]
+    set j 0
+    foreach i $what {
+        if {[info exists cites($i)]} {
+            unset cites($i)
+            incr j
+        }
+    }
+    putquick "PRIVMSG $c :$j facts removed"
 }
 
 proc pub:cdbset {n u h c a} {
-	global cites citecount
-	set id [lindex $a 0]
-   	set txt [string trim [lrange $a 1 end]]
+    global cites citecount
+    set id [lindex $a 0]
+   	set txt [regsub {^\s*\d+\s+} [string trim $a] {}]
     if {[string length $txt] > 0 && $id >= 0 && $id <= $citecount} {
     	putquick "PRIVMSG $c :\[$id\] $txt"
     	set cites($id) $txt
@@ -144,7 +144,7 @@ proc pub:cdbadd {n u h c a} {
 proc int:cdbsave {} {
     global citedb cites citecount
     set fp [open $citedb w]
-	puts $fp [list array set cites [array get cites]]
+    puts $fp [list array set cites [array get cites]]
     puts $fp [list set citecount [set citecount]]
     close $fp;
 }
@@ -155,23 +155,23 @@ proc auto:cdbsave {m h d w y} {
 
 proc pub:cdbsave {n u h c a} {
     int:cdbsave
-	putquick "PRIVMSG $c :facts saved"
+    putquick "PRIVMSG $c :facts saved"
 }
 
 proc pub:cdbreset {n u h c a} {
-	global cites citecount
+    global cites citecount
     set citecount 0
-	unset cites
-	array set cites {}
-	putquick "PRIVMSG $c :facts cleared"
+    unset cites
+    array set cites {}
+    putquick "PRIVMSG $c :facts cleared"
 }
 
 proc int:cdbread {} {
     global citedb cites citecount
-	uplevel {
-	    if {[file exist $citedb]} {
+    uplevel {
+        if {[file exist $citedb]} {
             unset cites
-			source $citedb
+            source $citedb
         }
     }
 }
