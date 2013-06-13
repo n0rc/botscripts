@@ -12,7 +12,6 @@ set calurl "http://your.server.tld/calendar.ics"
 load $sqlite3lib sqlite3
 
 sqlite3 db $dbfile
-set vers "0.1"
 
 #unbind pub o|o !whatweek pub:get_events_week
 #unbind pub o|o !whatmonth pub:get_events_month
