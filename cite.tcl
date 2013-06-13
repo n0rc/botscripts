@@ -12,7 +12,7 @@ bind pub - !help pub:cdbhelp
 bind msg - !help msg:cdbhelp
 bind pub - !fact pub:cdbfact
 bind msg - !fact msg:cdbfact
-bind pub - !rand pub:cdbrand
+bind pub - !randfact pub:cdbrand
 bind pub o|F !set pub:cdbset
 bind pub o|F !save pub:cdbsave
 bind pub o|R !reset pub:cdbreset
@@ -46,11 +46,11 @@ proc msg:cdbhelp {n u h a} {
     puthelp "PRIVMSG $n :factbot: <fact>  | idem"
     puthelp "PRIVMSG $n :!grep <regex>    | search facts for <regex>"
     puthelp "PRIVMSG $n :!help            | guess what?"
-    puthelp "PRIVMSG $n :!rand            | get a random fact"
+    puthelp "PRIVMSG $n :!randfact        | get a random fact"
 }
 
 proc pub:cdbhelp {n u h c a} {
-    msg:cdbhelp n u h a
+    msg:cdbhelp $n $u $h $a
 }
 
 proc pub:cdblist {n u h c a} {
@@ -158,7 +158,7 @@ proc pub:cdbdel {n u h c a} {
 
 proc pub:cdbset {n u h c a} {
     global cites citecount
-    set id [lindex $a 0]
+    set id [lindex "$a" 0]
    	set txt [regsub {^\s*\d+\s+} [string trim $a] {}]
     if {[string length $txt] > 0 && $id >= 0 && $id <= $citecount} {
     	putquick "PRIVMSG $c :\[$id\] $txt"
