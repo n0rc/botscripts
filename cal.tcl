@@ -29,8 +29,10 @@ bind msg - !whatnext msg:get_next
 bind msg - !whatweek msg:get_events_week
 
 bind pub o|o !whatmonth pub:get_events_month
-bind pub oE|E !addevent pub:add_event
-bind pub oE|E !delevent pub:del_event
+
+bind pub - !addevent pub:add_event
+bind pub - !delevent pub:del_event
+
 bind pub o|o !clearevents pub:clear_events
 
 bind msg oE|E !addevent msg:add_event
@@ -124,7 +126,12 @@ proc all:add_event {target args} {
     regexp {^([\w\-\+ ]+? \d\d?:\d\d) (.+)$} [regsub -all {\s+} [string trim [join $args " "]] { }] -> dt txt
     set dt [int:get_date $dt "%s"]
     if {$dt != -1 && [string length $txt] > 0} {
-        db eval {INSERT OR IGNORE INTO events VALUES(NULL, :dt, :txt)}
+        set recurr ""
+        regexp {^.+?(\(daily|weekly|monthly)\)$} $txt -> recurr
+        if {[string length $recurr] == 0} {
+            set recurr "false"
+        }
+        db eval {INSERT OR IGNORE INTO events VALUES(NULL, :dt, :txt, :recurr)}
         if {[db changes] > 0} {
             exec $perlbin $cal2ics
             set out "event added"
@@ -160,7 +167,7 @@ proc all:del_event {target args} {
             set out "no such event exists"
         }
     } else {
-        set out "syntax: !delevent <date descriptor> HH?:MM <event pattern>"
+        set out "syntax: !delevent <date descriptor> HH?:MM <exact event string>"
     }
     putquick "PRIVMSG $target :$out"
 }
@@ -180,10 +187,11 @@ proc all:get_next {target} {
 proc all:get_date {target args} {
     global db
     set txt [encoding convertto utf-8 [string trim [join $args " "]]]
+    set dt [int:get_day_start "now" "%s"]
     if {[string length $txt] > 0} {
         set out [db eval {
             SELECT strftime('%Y-%m-%d %H:%M', dtime, 'unixepoch', 'localtime') AS dt, event FROM events
-            WHERE event LIKE '%' || :txt || '%'
+            WHERE dtime >= :dt AND event LIKE '%' || :txt || '%'
             ORDER BY dtime
             LIMIT 5
         }]

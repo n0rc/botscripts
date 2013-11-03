@@ -13,10 +13,10 @@ bind msg - !help msg:cdbhelp
 bind pub - !fact pub:cdbfact
 bind msg - !fact msg:cdbfact
 bind pub - !randfact pub:cdbrand
+bind pub - !del pub:cdbdel
 bind pub o|F !set pub:cdbset
 bind pub o|F !save pub:cdbsave
 bind pub o|R !reset pub:cdbreset
-bind pub o|R !del pub:cdbdel
 bind pub o|F !flush pub:cdbflush
 bind pub - !grep pub:cdbsearch
 bind msg - !grep msg:cdbsearch
@@ -44,6 +44,7 @@ proc msg:cdbhelp {n u h a} {
     puthelp "PRIVMSG $n :!fact <#>        | get fact num <#>"
     puthelp "PRIVMSG $n :!add <fact>      | add <fact>"
     puthelp "PRIVMSG $n :factbot: <fact>  | idem"
+    puthelp "PRIVMSG $n :!del <#>         | delete fact num <#>"
     puthelp "PRIVMSG $n :!grep <regex>    | search facts for <regex>"
     puthelp "PRIVMSG $n :!help            | guess what?"
     puthelp "PRIVMSG $n :!randfact        | get a random fact"
