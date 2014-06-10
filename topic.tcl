@@ -3,8 +3,10 @@
 
 package require http
 
-set vers "0.1"
-set sre {(?i)\yh(?:oe|ö)hle:?\s+(up|down|broken)\y}
+set vers "0.2"
+set pinghost "your.ping.host"
+set sre {(?i)\y(h(?:oe|ö)hle:?\s+)(up|down|broken)\y}
+set pre {(?i)\y(pinghost:?\s+)(up|down)\y}
 set statusurl "http://your-server.tld/api"
 set statuschan "#your-channel"
 
@@ -18,6 +20,7 @@ bind pub - !hinit pub:hinit
 bind pub - !hauto pub:hinit
 bind msg - !hhelp msg:hhelp
 bind time - "*" auto:check:status
+bind time - "*" auto:check:ping
 
 proc msg:hhelp {n u h a} {
     global vers
@@ -81,12 +84,34 @@ proc pub:set:htoggle {n u h c a} {
     global sre
     set status ""
     set topic [topic $c]
-    if {[regexp $sre $topic -> status]} {
-        set topic [regsub $status $topic [int:toggle:status [string tolower $status]]]
+    if {[regexp $sre $topic -> -> status]} {
+        set topic [regsub $sre $topic "\\1[int:toggle:status [string tolower $status]]"]
         putserv "TOPIC $c :$topic"
         int:disable:timer $c
     } else {
-        putserv "PRIVMSG $c :no topic status section found"
+        putserv "PRIVMSG $c :no hoehle status section found in topic"
+    }
+}
+
+proc int:ping:host {pinghost} {
+    if {[catch {exec ping -c 3 $pinghost >/dev/null 2>@1} result]} {
+        return "down"
+    } else {
+        return "up"
+    }
+}
+
+proc auto:check:ping {m h d w y} {
+    global pre pinghost statuschan
+    set status ""
+    set newstatus [int:ping:host $pinghost]
+    set topic [topic $statuschan]
+    set ret 1
+    if {[regexp $pre $topic -> -> status]} {
+        if {[string tolower $status] != $newstatus} {
+            set topic [regsub $pre $topic "\\1$newstatus"]
+            putserv "TOPIC $statuschan :$topic"
+        }
     }
 }
 
@@ -95,18 +120,18 @@ proc int:set:status {newstatus c mode} {
     set status ""
     set topic [topic $c]
     set ret 1
-    if {[regexp $sre $topic -> status]} {
+    if {[regexp $sre $topic -> -> status]} {
         if {[string tolower $status] == $newstatus} {
             if {$mode != "quiet"} {
                 putserv "PRIVMSG $c :see topic :P"
             }
         } else {
-            set topic [regsub $status $topic $newstatus]
+            set topic [regsub $sre $topic "\\1$newstatus"]
             putserv "TOPIC $c :$topic"
             set ret 0
         }
     } elseif {$mode != "quiet"} {
-        putserv "PRIVMSG $c :no topic status section found"
+        putserv "PRIVMSG $c :no hoehle status section found in topic"
     }
     return $ret
 }
