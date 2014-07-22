@@ -123,7 +123,7 @@ proc all:add_event {target args} {
     global db perlbin cal2ics
     set dt ""
     set txt ""
-    regexp {^([\w\-\+ ]+? \d\d?:\d\d) (.+)$} [regsub -all {\s+} [string trim [join $args " "]] { }] -> dt txt
+    regexp {^([\w\-\+ ]+? \d\d?:\d\d) \|* ?(.+)$} [regsub -all {\s+} [string trim [join $args " "]] { }] -> dt txt
     set dt [int:get_date $dt "%s"]
     if {$dt != -1 && [string length $txt] > 0} {
         set recurr ""
