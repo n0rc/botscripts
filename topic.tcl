@@ -3,9 +3,9 @@
 
 package require http
 
-set vers "0.2"
+set vers "0.3"
 set pinghost "your.ping.host"
-set sre {(?i)\y(h(?:oe|ö)hle:?\s+)(up|down|broken)\y}
+set sre {(?i)\y(h(?:oe|ö)hle:?\s+)(up|down|unknown|broken)\y}
 set pre {(?i)\y(pinghost:?\s+)(up|down)\y}
 set statusurl "http://your-server.tld/api"
 set statuschan "#your-channel"
@@ -61,13 +61,20 @@ proc pub:hinit {n u h c a} {
 proc auto:check:status {m h d w y} {
     global statusurl statuschan timer
     if {$timer == 1} {
-        set data [::http::data [::http::geturl $statusurl]]
-        if {$data == "1"} {
-            int:set:status up $statuschan quiet
-        } elseif {$data == "0"} {
-            int:set:status down $statuschan quiet
-        } elseif {$data == "?"} {
-            int:set:status broken $statuschan quiet
+        set token [::http::geturl $statusurl -timeout 10000]
+        set code [::http::ncode $token]
+        set status [::http::status $token]
+        if {$code == 200 && $status == "ok"} {
+            set data [::http::data [::http::geturl $statusurl]]
+            if {$data == "1"} {
+                int:set:status "up" $statuschan quiet
+            } elseif {$data == "0"} {
+                int:set:status "down" $statuschan quiet
+            } elseif {$data == "?"} {
+                int:set:status "unknown" $statuschan quiet
+            }
+        } else {
+            int:set:status "broken" $statuschan quiet
         }
     }
 }
