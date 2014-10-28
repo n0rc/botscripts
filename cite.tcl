@@ -11,8 +11,6 @@ set citecount 0
 set citeschanged 0
 
 bind pub o|F !list pub:cdblist
-bind pub - !help pub:cdbhelp
-bind msg - !help msg:cdbhelp
 bind pub - !fact pub:cdbfact
 bind msg - !fact msg:cdbfact
 bind pub - !randfact pub:cdbrand
@@ -36,25 +34,6 @@ proc pub:cdbrand {n u h c a} {
     } else {
         putquick "PRIVMSG $c :currently no facts exist"
     }
-}
-
-proc msg:cdbhelp {n u h a} {
-    global vers
-    puthelp "PRIVMSG $n :factbot v$vers  --  autosave every 10 minutes"
-    puthelp "PRIVMSG $n :==========================================="
-    puthelp "PRIVMSG $n :channel cmd      | desc"
-    puthelp "PRIVMSG $n :-----------------+-------------------------"
-    puthelp "PRIVMSG $n :!fact <#>        | get fact num <#>"
-    puthelp "PRIVMSG $n :!add <fact>      | add <fact>"
-    puthelp "PRIVMSG $n :factbot: <fact>  | idem"
-    puthelp "PRIVMSG $n :!del <#>         | delete fact num <#>"
-    puthelp "PRIVMSG $n :!grep <regex>    | search facts for <regex>"
-    puthelp "PRIVMSG $n :!help            | guess what?"
-    puthelp "PRIVMSG $n :!randfact        | get a random fact"
-}
-
-proc pub:cdbhelp {n u h c a} {
-    msg:cdbhelp $n $u $h $a
 }
 
 proc pub:cdblist {n u h c a} {
@@ -224,7 +203,6 @@ proc auto:cdbsave {m h d w y} {
 
 proc pub:cdbsave {n u h c a} {
     int:cdbsave
-    putquick "PRIVMSG $c :facts saved"
 }
 
 proc pub:cdbreset {n u h c a} {

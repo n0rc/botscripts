@@ -15,36 +15,26 @@ set timer 1
 bind pub - !hup pub:set:hup
 bind pub - !hdown pub:set:hdown
 bind pub - !htoggle pub:set:htoggle
-bind pub - !hhelp pub:hhelp
 bind pub - !hinit pub:hinit
 bind pub - !hauto pub:hinit
-bind msg - !hhelp msg:hhelp
+bind pub - !hstop pub:hstop
 bind time - "*" auto:check:status
 bind time - "*" auto:check:ping
-
-proc msg:hhelp {n u h a} {
-    global vers
-    puthelp "PRIVMSG $n :statusbot v$vers"
-    puthelp "PRIVMSG $n :=============================================================="
-    puthelp "PRIVMSG $n :channel cmd      | desc"
-    puthelp "PRIVMSG $n :-----------------+--------------------------------------------"
-    puthelp "PRIVMSG $n :!hup             | sets status to 'up' (disables auto topic)"
-    puthelp "PRIVMSG $n :!hdown           | sets status to 'down' (disables auto topic)"
-    puthelp "PRIVMSG $n :!htoggle         | toggles status (disables auto topic)"
-    puthelp "PRIVMSG $n :!hinit           | (re)enables auto topic"
-    puthelp "PRIVMSG $n :!hauto           | idem"
-    puthelp "PRIVMSG $n :!hhelp           | guess what?"
-}
-
-proc pub:hhelp {n u h c a} {
-    msg:hhelp $n $u $h $a
-}
 
 proc int:disable:timer {c} {
     global timer
     if {$timer == 1} {
         set timer 0
         putserv "PRIVMSG $c :auto topic disabled"
+    }
+}
+
+proc pub:hstop {n u h c a} {
+    global timer
+    if {$timer == 0} {
+        putserv "PRIVMSG $c :auto topic already disabled"
+    } else {
+        int:disable:timer $c
     }
 }
 
@@ -109,15 +99,17 @@ proc int:ping:host {pinghost} {
 }
 
 proc auto:check:ping {m h d w y} {
-    global pre pinghost statuschan
-    set status ""
-    set newstatus [int:ping:host $pinghost]
-    set topic [topic $statuschan]
-    set ret 1
-    if {[regexp $pre $topic -> -> status]} {
-        if {[string tolower $status] != $newstatus} {
-            set topic [regsub $pre $topic "\\1$newstatus"]
-            putserv "TOPIC $statuschan :$topic"
+    global pre pinghost statuschan timer
+    if {$timer == 1} {
+        set status ""
+        set newstatus [int:ping:host $pinghost]
+        set topic [topic $statuschan]
+        set ret 1
+        if {[regexp $pre $topic -> -> status]} {
+            if {[string tolower $status] != $newstatus} {
+                set topic [regsub $pre $topic "\\1$newstatus"]
+                putserv "TOPIC $statuschan :$topic"
+            }
         }
     }
 }
