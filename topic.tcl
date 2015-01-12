@@ -5,6 +5,7 @@ package require http
 
 set vers "0.3"
 set pinghost "your.ping.host"
+set pingbin "/bin/ping6"
 set sre {(?i)\y(h(?:oe|ö)hle:?\s+)(up|down|unknown|broken)\y}
 set pre {(?i)\y(pinghost:?\s+)(up|down)\y}
 set statusurl "http://your-server.tld/api"
@@ -91,7 +92,8 @@ proc pub:set:htoggle {n u h c a} {
 }
 
 proc int:ping:host {pinghost} {
-    if {[catch {exec ping -c 3 $pinghost >/dev/null 2>@1} result]} {
+    global pingbin
+    if {[catch {exec $pingbin -c 3 $pinghost >/dev/null 2>@1} result]} {
         return "down"
     } else {
         return "up"
