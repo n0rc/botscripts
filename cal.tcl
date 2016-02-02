@@ -1,9 +1,10 @@
 # eggdrop sqlite calendar script
 # (c)2013 cr0n
 
-set vers "0.2"
+set vers "0.3"
 set dbfile "scripts/cal.sqlite"
-set sqlite3lib "/usr/lib/sqlite3/libtclsqlite3.so"
+set sqlite3lib "/usr/lib/tcltk/sqlite3/libtclsqlite3.so"
+#set sqlite3lib "/usr/lib/sqlite3/libtclsqlite3.so"
 
 set perlbin "/usr/bin/perl"
 set cal2ics "/path/to/cal2ics.pl"
@@ -13,8 +14,7 @@ load $sqlite3lib sqlite3
 
 sqlite3 db $dbfile
 
-#unbind pub o|o !whatweek pub:get_events_week
-#unbind pub o|o !whatmonth pub:get_events_month
+setudef flag calendar
 
 bind pub - !calurl pub:get_calurl
 bind pub - !when pub:get_date
@@ -66,11 +66,14 @@ proc int:db_create {db} {
     db eval {
         CREATE TABLE events(
             id integer primary key,
-            dtime integer,
-            event text
+            stime integer,
+            etime integer,
+            event text,
+            recurr text,
+            wholeday text
         )
     }
-    db eval {CREATE UNIQUE INDEX event_unique on events(dtime,event)}
+    db eval {CREATE UNIQUE INDEX event_unique on events(stime,event)}
 }
 
 proc int:get_day_start {str fmt} {
@@ -104,8 +107,12 @@ proc all:get_calurl {target} {
 
 proc all:out_events {out target emptymsg} {
     if {[llength $out] > 0} {
-        foreach {d e} $out {     
-            putserv "PRIVMSG $target :$d | $e"
+        foreach {start end event} $out {
+            if {$start == $end} {
+                putserv "PRIVMSG $target :$start | $event"
+            } else {
+                putserv "PRIVMSG $target :$start - $end | $event"
+            }
         }
     } else {
         putquick "PRIVMSG $target :$emptymsg"
@@ -121,53 +128,92 @@ proc all:clear_events {target} {
 
 proc all:add_event {target args} {
     global db perlbin cal2ics
-    set dt ""
     set txt ""
-    regexp {^([\w\-\+ ]+? \d\d?:\d\d) \|* ?(.+)$} [regsub -all {\s+} [string trim [join $args " "]] { }] -> dt txt
-    set dt [int:get_date $dt "%s"]
-    if {$dt != -1 && [string length $txt] > 0} {
-        set recurr ""
-        regexp {^.+?(\(daily|weekly|monthly)\)$} $txt -> recurr
-        if {[string length $recurr] == 0} {
-            set recurr "false"
-        }
-        db eval {INSERT OR IGNORE INTO events VALUES(NULL, :dt, :txt, :recurr)}
-        if {[db changes] > 0} {
-            exec $perlbin $cal2ics
-            set out "event added"
+    set wholeday ""
+    if {[regexp {^([\w\-\+ ]+?) (\d\d?:\d\d|wholeday)(?: ([1-9]\d* (?:minute|hour|day)s?))? \|* ?(.+)$} [regsub -all {\s+} [string trim [join $args " "]] { }] -> day stime dur txt]} {
+        if {$stime == "wholeday"} {
+            set wholeday "true"
+            set dstart [int:get_day_start $day "%s"]
+            if {$dur == ""} {
+                # double call to allow queries like "next sunday +3 days"
+                set dend [int:get_date "$day" "%Y-%m-%d 00:00"]
+                set dend [int:get_date "$dend +1 days" "%s"]
+            } else {
+                if {[regexp {^(\d+) days?$} $dur -> numdays]} {
+                    # see above comment
+                    set dend [int:get_date "$day" "%Y-%m-%d 00:00"]
+                    set dend [int:get_date "$dend +$numdays days" "%s"]
+                } else {
+                    putquick "PRIVMSG $target :that does not make sense"
+                    return
+                }
+            }
         } else {
-            set out "event not added - dupe"
+            set wholeday "false"
+            set dstart [int:get_date "$day $stime" "%s"]
+            if {$dur == ""} {
+                set dend $dstart
+            } else {
+                # again, see above
+                set dend [int:get_date "$day $stime" "%Y-%m-%d %H:%M"]
+                set dend [int:get_date "$dend +$dur" "%s"]
+            }
+        }
+        if {$dstart != -1 && $dend != -1 && [string length $txt] > 0} {
+            set recurr ""
+            regexp {^.+?(\(daily|weekly|monthly)\)$} $txt -> recurr
+            if {[string length $recurr] == 0} {
+                set recurr "false"
+            }
+            db eval {INSERT OR IGNORE INTO events VALUES(NULL, :dstart, :dend, :txt, :recurr, :wholeday)}
+            if {[db changes] > 0} {
+                exec $perlbin $cal2ics
+                set out "event added"
+            } else {
+                set out "event not added - dupe"
+            }
+        } else {
+            set out "syntax: !addevent <start date descriptor> (HH?:MM|wholeday) \[duration (hours|minutes|days)\] event description ..."
         }
     } else {
-        set out "syntax: !addevent <date descriptor> HH?:MM event description ..."
+        set out "syntax: !addevent <start date descriptor> (HH?:MM|wholeday) \[duration (hours|minutes|days)\] event description ..."
     }
     putquick "PRIVMSG $target :$out"
 }
 
 proc all:del_event {target args} {
     global db perlbin cal2ics
-    set dt ""
     set txt ""
-    regexp {^([\w\- ]+? \d\d?:\d\d) (.+)$} [regsub -all {\s+} [string trim [join $args " "]] { }] -> dt txt
-    set dt [int:get_date $dt "%s"]
-    if {$dt != -1 && [string length $txt] > 0} {
-        db eval {
-            DELETE FROM events
-            WHERE event LIKE :txt AND dtime = :dt
-        }
-        set dels [db changes]
-        if {$dels > 0} {
-            if {$dels > 1} {
-                set out "$dels events deleted"
-            } else {
-                set out "$dels event deleted"
-            }
-            exec $perlbin $cal2ics
+    set wholeday ""
+    if {[regexp {^([\w\-\+ ]+?) (\d\d?:\d\d|wholeday)(?: (\d+ (?:minute|hour|day)s?))? \|* ?(.+)$} [regsub -all {\s+} [string trim [join $args " "]] { }] -> day stime dur txt]} {
+        if {$stime == "wholeday"} {
+           set wholeday "true"
+           set dstart [int:get_day_start $day "%s"]
         } else {
-            set out "no such event exists"
+           set wholeday "false"
+           set dstart [int:get_date "$day $stime" "%s"]
+        }
+        if {$dstart != -1 && [string length $txt] > 0} {
+            db eval {
+                DELETE FROM events
+                WHERE event LIKE :txt AND stime = :dstart AND wholeday = :wholeday
+            }
+            set dels [db changes]
+            if {$dels > 0} {
+                if {$dels > 1} {
+                    set out "$dels events deleted"
+                } else {
+                    set out "$dels event deleted"
+                }
+                exec $perlbin $cal2ics
+            } else {
+                set out "no such event exists"
+            }
+        } else {
+            set out "syntax: !delevent <start date descriptor> (HH?:MM|wholeday) <exact event string>"
         }
     } else {
-        set out "syntax: !delevent <date descriptor> HH?:MM <exact event string>"
+        set out "syntax: !delevent <start date descriptor> (HH?:MM|wholeday) <exact event string>"
     }
     putquick "PRIVMSG $target :$out"
 }
@@ -176,9 +222,9 @@ proc all:get_next {target} {
     global db
     set dt [int:get_date "now" "%s"]
     set out [db eval {
-        SELECT strftime('%Y-%m-%d %H:%M', dtime, 'unixepoch', 'localtime') AS dt, event FROM events
-        WHERE dtime >= :dt
-        ORDER BY dtime
+        SELECT strftime('%Y-%m-%d %H:%M', stime, 'unixepoch', 'localtime') AS start, strftime('%Y-%m-%d %H:%M', etime, 'unixepoch', 'localtime') AS end, event FROM events
+        WHERE stime >= :dt
+        ORDER BY stime
         LIMIT 1
     }]
     all:out_events $out $target "no future events exist"
@@ -190,9 +236,9 @@ proc all:get_date {target args} {
     set dt [int:get_day_start "now" "%s"]
     if {[string length $txt] > 0} {
         set out [db eval {
-            SELECT strftime('%Y-%m-%d %H:%M', dtime, 'unixepoch', 'localtime') AS dt, event FROM events
-            WHERE dtime >= :dt AND event LIKE '%' || :txt || '%'
-            ORDER BY dtime
+            SELECT strftime('%Y-%m-%d %H:%M', stime, 'unixepoch', 'localtime') AS start, strftime('%Y-%m-%d %H:%M', etime, 'unixepoch', 'localtime') AS end, event FROM events
+            WHERE (stime >= :dt OR etime >= :dt) AND event LIKE '%' || :txt || '%'
+            ORDER BY stime
             LIMIT 5
         }]
         all:out_events $out $target "no such event exists"
@@ -207,9 +253,9 @@ proc all:get_events {target args} {
     set dt [int:get_date [int:get_date [string trim [join $args " "]] "%Y-%m-%d 00:00"] "%s"]
     if {$dt != -1} {
         set out [db eval {
-            SELECT strftime('%Y-%m-%d %H:%M', dtime, 'unixepoch', 'localtime') AS dt, event FROM events
-            WHERE dtime >= :dt AND dtime < :dt + 86400
-            ORDER BY dtime
+            SELECT strftime('%Y-%m-%d %H:%M', stime, 'unixepoch', 'localtime') AS start, strftime('%Y-%m-%d %H:%M', etime, 'unixepoch', 'localtime') AS end, event FROM events
+            WHERE (stime >= :dt AND stime < :dt + 86400) OR (etime > :dt AND etime < :dt + 86400) OR (stime < :dt AND etime >= :dt + 86400)
+            ORDER BY stime
             LIMIT 5
         }]
         all:out_events $out $target "no events exist for that date"
@@ -225,9 +271,9 @@ proc all:get_events_week {target args} {
     set dt [int:get_week_start $off "%s"]
     if {$dt != -1} {
         set out [db eval {
-            SELECT strftime('%Y-%m-%d %H:%M', dtime, 'unixepoch', 'localtime') AS dt, event FROM events
-            WHERE dtime >= :dt AND dtime < :dt + 604800
-            ORDER BY dtime
+            SELECT strftime('%Y-%m-%d %H:%M', stime, 'unixepoch', 'localtime') AS start, strftime('%Y-%m-%d %H:%M', etime, 'unixepoch', 'localtime') AS end, event FROM events
+            WHERE (stime >= :dt AND stime < :dt + 604800) OR (etime > :dt AND etime < :dt + 604800) OR (stime < :dt AND etime >= :dt + 604800)
+            ORDER BY stime
             LIMIT 10
         }]
         all:out_events $out $target "no events exist for this week"
@@ -245,9 +291,9 @@ proc all:get_events_month {target args} {
     set dte [int:get_date "$tmp +1 month" "%s"]
     if {$dts != -1 && $dte != -1} {
         set out [db eval {
-            SELECT strftime('%Y-%m-%d %H:%M', dtime, 'unixepoch', 'localtime') AS dt, event FROM events
-            WHERE dtime >= :dts AND dtime < :dte
-            ORDER BY dtime
+            SELECT strftime('%Y-%m-%d %H:%M', stime, 'unixepoch', 'localtime') AS dt, event FROM events
+            WHERE stime >= :dt AND stime < :dt
+            ORDER BY stime
             LIMIT 10
         }]
         all:out_events $out $target "no events exist for this month"
@@ -261,6 +307,7 @@ proc msg:get_calurl {n u h a} {
 }
 
 proc pub:get_calurl {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:get_calurl $c
 }
 
@@ -269,6 +316,7 @@ proc msg:clear_events {n u h a} {
 }
 
 proc pub:clear_events {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:clear_events $c
 }
 
@@ -277,6 +325,7 @@ proc msg:add_event {n u h a} {
 }
 
 proc pub:add_event {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:add_event $c $a
 }
 
@@ -285,6 +334,7 @@ proc msg:del_event {n u h a} {
 }
 
 proc pub:del_event {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:del_event $c $a
 }
 
@@ -293,6 +343,7 @@ proc msg:get_next {n u h a} {
 }
 
 proc pub:get_next {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:get_next $c
 }
 
@@ -301,6 +352,7 @@ proc msg:get_date {n u h a} {
 }
 
 proc pub:get_date {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:get_date $c $a
 }
 
@@ -309,6 +361,7 @@ proc msg:get_events {n u h a} {
 }
 
 proc pub:get_events {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:get_events $c $a
 }
 
@@ -317,6 +370,7 @@ proc msg:get_events_week {n u h a} {
 }
 
 proc pub:get_events_week {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:get_events_week $c $a
 }
 
@@ -325,6 +379,7 @@ proc msg:get_events_month {n u h a} {
 }
 
 proc pub:get_events_month {n u h c a} {
+    if {![channel get $c calendar]} { return }
     all:get_events_month $c $a
 }
 

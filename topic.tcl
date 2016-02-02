@@ -2,6 +2,9 @@
 # (c)2012 cr0n
 
 package require http
+package require tls
+
+::http::register https 443 [list ::tls::socket -tls1 1]
 
 set vers "0.3"
 set pinghost "your.ping.host"

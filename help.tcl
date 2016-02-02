@@ -2,8 +2,10 @@
 # (c)2014 cr0n
 
 set vers "0.1"
-set botvers "0.4"
-set cmdurl "http://url.with.further.info"
+set botvers "0.5"
+set cmdurl "https://url.with.further.info/about/your/bot"
+
+setudef flag help
 
 bind pub - !help pub:help
 bind msg - !help msg:help
@@ -11,14 +13,14 @@ bind msg - !help msg:help
 proc int:print:header {n} {
     global botvers
     puthelp "PRIVMSG $n :factbot v$botvers"
-    puthelp "PRIVMSG $n :━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    puthelp "PRIVMSG $n :━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     puthelp "PRIVMSG $n :channel command                    │ description"
-    puthelp "PRIVMSG $n :───────────────────────────────────┼─────────────────────────────────────────────"
+    puthelp "PRIVMSG $n :───────────────────────────────────┼─────────────────────────────────────────────────────"
 }
 
 proc int:print:footer {n} {
     global cmdurl
-    puthelp "PRIVMSG $n :━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    puthelp "PRIVMSG $n :━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     puthelp "PRIVMSG $n :complete list of commands: $cmdurl"
 }
 
@@ -49,8 +51,8 @@ proc int:print:help:facts {n} {
 }
 
 proc int:print:help:calendar {n} {
-    puthelp "PRIVMSG $n :!addevent <date> HH?:MM foo bar    │ add event 'foo bar' at <date> HH?:MM"
-    puthelp "PRIVMSG $n :!delevent <date> HH?:MM foo bar    │ delete event 'foo bar' at <date> HH?:MM"
+    puthelp "PRIVMSG $n :!addevent <date> ... foo bar       │ add event 'foo bar' at <date>      --> see url below"
+    puthelp "PRIVMSG $n :!delevent <date> ... foo bar       │ delete event 'foo bar' at <date>   --> see url below"
     puthelp "PRIVMSG $n :!what <date>                       │ get all events at <date>"
     puthelp "PRIVMSG $n :!when foo bar                      │ get the scheduled date for 'foo bar'"
     puthelp "PRIVMSG $n :!whatnext                          │ get next event"
@@ -78,6 +80,7 @@ proc msg:help {n u h a} {
 }
 
 proc pub:help {n u h c a} {
+    if {![channel get $c help]} { return }
     msg:help $n $u $h $a
 }
 

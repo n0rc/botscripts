@@ -5,9 +5,12 @@ set vers "0.1"
 set host "your_ip"
 set port "your_port"
 
+setudef flag trollenv
+
 bind pub - !trollenv pub:get_data
 
 proc pub:get_data {n u h c a} {
+    if {![channel get $c trollenv]} { return }
     set data [int:get_data]
     if {[llength $data] == 1} {
         switch [lindex $data 0] {

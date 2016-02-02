@@ -6,6 +6,8 @@ set vers "0.2"
 set citedb "scripts/cite.db"
 set dumpfile "scripts/cite.db.txt"
 
+setudef flag cite
+
 array set cites {}
 set citecount 0
 set citeschanged 0
@@ -26,6 +28,7 @@ bind pub - factbot: pub:cdbadd
 bind time - "?0 *" auto:cdbsave
 
 proc pub:cdbrand {n u h c a} {
+    if {![channel get $c cite]} { return }
     global cites
     set keys [lsort -integer [array names cites]]
     if {[llength $keys] > 0} {
@@ -37,6 +40,7 @@ proc pub:cdbrand {n u h c a} {
 }
 
 proc pub:cdblist {n u h c a} {
+    if {![channel get $c cite]} { return }
     global cites
     set citequery [lsort -integer [array names cites]]
     if {[llength $citequery] == 0} {
@@ -59,6 +63,7 @@ proc msg:cdbfact {n u h a} {
 }
 
 proc pub:cdbfact {n u h c a} {
+    if {![channel get $c cite]} { return }
     global cites
     set id [lindex $a 0]
     if {[info exists cites($id)]} {
@@ -98,6 +103,7 @@ proc msg:cdbsearch {n u h a} {
 }
 
 proc pub:cdbsearch {n u h c a} {
+    if {![channel get $c cite]} { return }
     global cites
     set re [string trim $a]
     if {[string length $re] < 1} {
@@ -127,6 +133,7 @@ proc pub:cdbsearch {n u h c a} {
 }
 
 proc pub:cdbdel {n u h c a} {
+    if {![channel get $c cite]} { return }
     global cites citeschanged
     set what [string trim $a]
     set j 0
@@ -141,6 +148,7 @@ proc pub:cdbdel {n u h c a} {
 }
 
 proc pub:cdbset {n u h c a} {
+    if {![channel get $c cite]} { return }
     global cites citecount citeschanged
     set id [lindex "$a" 0]
     set txt [regsub {^\s*\d+\s+} [string trim $a] {}]
@@ -154,6 +162,7 @@ proc pub:cdbset {n u h c a} {
 }
 
 proc pub:cdbadd {n u h c a} {
+    if {![channel get $c cite]} { return }
     global cites citecount citeschanged
     set txt [string trim $a]
     if {[string length $txt] > 0 && $txt != "{}"} {
@@ -202,10 +211,12 @@ proc auto:cdbsave {m h d w y} {
 }
 
 proc pub:cdbsave {n u h c a} {
+    if {![channel get $c cite]} { return }
     int:cdbsave
 }
 
 proc pub:cdbreset {n u h c a} {
+    if {![channel get $c cite]} { return }
     global cites citecount
     set citecount 0
     unset cites
@@ -224,6 +235,7 @@ proc int:cdbread {} {
 }
 
 proc pub:cdbflush {n u h c a} {
+    if {![channel get $c cite]} { return }
     global citedb cites citecount
     uplevel {
         if {[file exist $citedb]} {
